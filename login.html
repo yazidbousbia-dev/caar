@@ -89,6 +89,10 @@ document.getElementById('authLangSwitch').innerHTML = langSwitcherHTML();
 document.getElementById('authThemeToggle').innerHTML = themeToggleHTML();
 </script>
 <script>
+// Mode démo : ouvrir une page admin crée une session « admin » automatique.
+// La page de connexion repart donc toujours d'une session vide, pour que chaque
+// compte (client / secrétaire / admin) arrive dans SON espace.
+if (STATIC_MODE) Auth.clear();
 Auth.redirectIfLoggedIn();
 
 const params = new URLSearchParams(window.location.search);
@@ -130,7 +134,10 @@ async function doLogin() {
     const res = await api('POST', '/login', { email, password });
     Auth.save(res.token, res.user);
     // Priorité : redirection explicite (ex: revenir sur une fiche voiture) > espace par défaut du rôle
-    window.location.href = redirectTo || Auth.homeFor(res.user.role);
+    // Un client n'est jamais envoyé vers l'administration, même si ?redirect= le demande.
+    const isStaff = ['admin', 'secretaire'].includes(res.user.role);
+    const safeRedirect = redirectTo && !/^(https?:|\/\/)/i.test(redirectTo) && (isStaff || !redirectTo.startsWith('pages/')) ? redirectTo : null;
+    window.location.href = safeRedirect || Auth.homeFor(res.user.role);
   } catch (e) {
     showError(e.message || 'Email ou mot de passe incorrect');
     btn.disabled = false;
